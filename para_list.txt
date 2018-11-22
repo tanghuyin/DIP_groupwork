@@ -3,4 +3,4 @@ void movePen(output_list)
 void onlyOne(Mat origin_pt, output_list)
 parameters type
 contour_list: std::vector<std::vector<cv::Point>> contours (has been written)
-output_list: size is a*b a = contours.size() b = 6 (int R int G int B, int x,  int y)
+output_list: size is a*b a = contours.size() b = 5 (int R int G int B, int x,  int y)
