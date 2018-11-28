@@ -49,7 +49,7 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	bitwise_not(partsAndBase, partsAndBase);
 	bitwise_not(base, base);
 	parts = partsAndBase - base;
-	parts = parts(cv::Rect(0, 450, width, 200));
+	parts = parts(cv::Rect(0, 450, width, 250));
 	bitwise_not(parts, partsinv);
 	bitwise_not(pt_binary, pt_binary);
 
@@ -80,16 +80,23 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 
 	// find the parts contour
 	cv::findContours(partsinv, contours1, hierarchy1, CV_RETR_TREE, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
-	for (int i = 1; i < 2; i++)
+	for (int i = 1; i < contours1.size(); i++)
 	{	
 		if (hierarchy1[i][3] != -1)
 			cv::drawContours(newpt, contours1, i, cv::Scalar(255), 1, 8);
 		
 	}
-	for (int i = 0; i < contours1[1].size(); i++)
+
+	std::vector<cv::Point2f> centers(contours1.size());
+	std::vector<std::vector<int>> centerRGB;
+	findCenterAndRGB(contours1, centers, centerRGB);
+	//test
+	for (int i = 1; i < contours1.size(); i++)
 	{
-		qDebug() << 'x' <<contours1[1][i].x << 'y' << contours1[1][i].y;
+		cv::circle(newpt, centers[i], 4, cv::Scalar(255));
 	}
+	qDebug() << centers.size();
+	//
 	cv::bitwise_not(newpt, newpt);
 	
 
@@ -114,6 +121,21 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	return 0; 
 }
 
+void findCenterAndRGB(std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<std::vector<int>> &RGB)
+{
+	std::vector<cv::Moments> mu(contours.size());
+	for (int i = 0; i < contours.size(); i++)
+	{
+		mu[i] = cv::moments(contours[i], true);
+	}
+	
+	for (int i = 0; i < contours.size(); i++)
+	{
+		centers[i] = cv::Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+	}
+	
+	return;
+}
 
 int get_max(int array1[], int n)
 {
