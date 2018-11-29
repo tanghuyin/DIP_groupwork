@@ -1,3 +1,10 @@
+//11.29update
+std::vector<cv::Point2f> centers(contours1.size());
+std::vector<int> centerGRAY(contours1.size());
+findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
+
+
+//
 void findCenterAndRGB(contours_list, output_list)
 void movePen(output_list)
 void onlyOne(Mat origin_pt, output_list)

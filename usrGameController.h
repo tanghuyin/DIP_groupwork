@@ -44,7 +44,7 @@ void getTheHist(cv::Mat *img, cv::Mat &dstImage);
 void moveSkewLines(std::vector<cv::Vec4i> &Lines);
 void addLines2Origin(cv::Mat &origin, std::vector<cv::Vec4i> &Lines);
 int get_max(int array1[], int n);
-void findCenterAndRGB(std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<std::vector<int>> &RGB);
+void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &RGB);
 
 #endif
 #endif

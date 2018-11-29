@@ -88,18 +88,19 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	}
 
 	std::vector<cv::Point2f> centers(contours1.size());
-	std::vector<std::vector<int>> centerRGB;
-	findCenterAndRGB(contours1, centers, centerRGB);
-	//test
-	for (int i = 1; i < contours1.size(); i++)
+	std::vector<int> centerGRAY(contours1.size());
+	findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
+	/*test
+	for (int i = 0; i < contours1.size(); i++)
 	{
-		cv::circle(newpt, centers[i], 4, cv::Scalar(255));
-	}
-	qDebug() << centers.size();
-	//
-	cv::bitwise_not(newpt, newpt);
-	
+		cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
+		qDebug() << centerGRAY[i];
 
+	}
+	*/
+	cv::bitwise_not(newpt, newpt);
+
+	
 
 	std::vector<cv::Vec4i> Lines;
 	//cv::HoughLinesP(newpt, Lines, 1, PI / 4, 2, 0, 5); // hough transform
@@ -108,7 +109,7 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	//only for test need, can be deleted when finished
 	//addLines2Origin(newpt, Lines);
 	//
-	cv::imshow(WIN_NAME, newpt);
+	cv::imshow(WIN_NAME, pt_gray);
 	//cv::Mat histGraph(256, 256, CV_8U, cv::Scalar(0)); only use for one time
 	//cv::blur(pt_gray, pt_gray, cv::Size(3, 3));
 	//getTheHist(&pt_gray, histGraph);
@@ -121,9 +122,10 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	return 0; 
 }
 
-void findCenterAndRGB(std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<std::vector<int>> &RGB)
+void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &RGB)
 {
 	std::vector<cv::Moments> mu(contours.size());
+	int grayscale;
 	for (int i = 0; i < contours.size(); i++)
 	{
 		mu[i] = cv::moments(contours[i], true);
@@ -131,9 +133,17 @@ void findCenterAndRGB(std::vector<std::vector<cv::Point>> &contours, std::vector
 	
 	for (int i = 0; i < contours.size(); i++)
 	{
-		centers[i] = cv::Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+		centers[i] = cv::Point2f(round(mu[i].m10 / mu[i].m00), round(mu[i].m01 / mu[i].m00)); // get the center of each parts
 	}
-	
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		centers[i].y += 450; // get the absolute coordinates before cutting the screen
+	}
+	for (int i = 0; i < contours.size(); i++)
+	{
+		RGB[i] = img.ptr<uchar>(int(centers[i].y))[int(centers[i].x)];
+	}
 	return;
 }
 
