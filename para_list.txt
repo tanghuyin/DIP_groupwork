@@ -3,6 +3,13 @@ std::vector<cv::Point2f> centers(contours1.size());
 std::vector<int> centerGRAY(contours1.size());
 findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
 
+api introduction:
+Attention!: i = 0的点是一个误操作产生的点，无法避免，i>=1时才是有意义的中心点 
+Work:
+1. Use centers[i].x, centers[i].y can get the coordinates of the i part's center, pay attention to that y means the row, x means the column. (float)
+2. Use centerGRAY[i] can get the grey scale value of i. (int)
+Problem:
+the function will execute all the time, we need to find a time to execute it once instead(for example: at the beginning of one game).
 
 //
 void findCenterAndRGB(contours_list, output_list)
