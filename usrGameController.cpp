@@ -7,7 +7,7 @@ usrGameController::usrGameController(void* qtCD)
 	qDebug() << "usrGameController online.";
 	device = new deviceCyberDip(qtCD);//设备代理类
 	cv::namedWindow(WIN_NAME);
-	//cv::setMouseCallback(WIN_NAME, mouseCallback, (void*)&(argM));
+	cv::setMouseCallback(WIN_NAME, mouseCallback, (void*)&(argM));
 }
 
 //析构
@@ -21,6 +21,8 @@ usrGameController::~usrGameController()
 	qDebug() << "usrGameController offline.";
 }
 
+bool flag = true;
+int i1 = 0;
 //处理图像 
 int usrGameController::usrProcessImage(cv::Mat& img)
 {
@@ -33,6 +35,35 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 
 	//截取图像边缘
 	cv::Mat pt = img(cv::Rect(0, UP_CUT, imgSize.width,imgSize.height));
+	//cv::imshow(WIN_NAME, pt);
+	 
+
+	//判断鼠标点击尺寸
+	if (argM.box.x >= 0 && argM.box.x < imgSize.width&&
+		argM.box.y >= 0 && argM.box.y < imgSize.height
+		)
+	{
+		qDebug() << "X:" << argM.box.x << " Y:" << argM.box.y;
+		qDebug() << "width:" << argM.box.width << " height:" << argM.box.height;
+		if (argM.Hit)
+		{
+			device->comHitDown();
+		}
+		double x = ((double)argM.box.x + argM.box.width) / pt.cols;
+		double y = ((double)argM.box.y + argM.box.height) / pt.rows;
+		qDebug() << "X:" << 1-y << " Y:" << x;
+		device->comMoveToScale(1-y, x);
+		argM.box.x = -1; argM.box.y = -1;
+		if (argM.Hit)
+		{
+			device->comHitUp();
+		}
+		else
+		{
+			device->comHitOnce();
+		}
+	}
+
 	//our code 
 	cv::Mat pt_gray, pt_binary, edge, parts, base, partsinv, partsAndBase;
 	int width = pt.cols;
@@ -90,14 +121,36 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	std::vector<cv::Point2f> centers(contours1.size());
 	std::vector<int> centerGRAY(contours1.size());
 	findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
-	/*test
-	for (int i = 0; i < contours1.size(); i++)
+	//movePen(pt_gray, contours1, centers);
+	if (flag) 
 	{
-		cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
-		qDebug() << centerGRAY[i];
+		for (int i = 0; i < contours1.size(); i++)
+		{
+			cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
+			double x = 1 - centers[i].y / pt_gray.rows;
+			double y = centers[i].x / pt_gray.cols;
+			qDebug() << centerGRAY[i] << " x:" << x << " y:" << y;
+			device->comMoveToScale(x, y);
+			//device->comMoveToScale(0.1, 0.1);
+			device->comHitDown();
+			device->comMoveToScale(0.5, 0.5);
+			savePicture(pt_gray,i);
+			device->comHitUp();
+			device->comMoveToScale(0, 0);
+			x = -1; y = -1;
+		}
+		/*test
+		for (int i = 0; i < contours1.size(); i++)
+		{
+			cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
+			qDebug() << centerGRAY[i]<<" x:"<<centers[i].x<<" y:"<<centers[i].y;
 
+		}*/
 	}
-	*/
+
+
+
+	flag = false;
 	cv::bitwise_not(newpt, newpt);
 
 	
@@ -147,6 +200,21 @@ void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours
 	return;
 }
 
+
+void savePicture(cv::Mat img, int i)
+{
+	switch (i)
+	{
+	case  1:cv::imwrite("contours1.jpg", img); break;
+	case  2:cv::imwrite("contours2.jpg", img); break;
+	case  3:cv::imwrite("contours3.jpg", img); break;
+	case  4:cv::imwrite("contours4.jpg", img); break;
+	case  5:cv::imwrite("contours5.jpg", img); break;
+	case  6:cv::imwrite("contours6.jpg", img); break;
+	case  0:cv::imwrite("base.jpg", img); break;
+	}
+	return;
+}
 int get_max(int array1[], int n)
 {
 	int max = array1[0];
