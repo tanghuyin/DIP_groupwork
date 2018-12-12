@@ -1,6 +1,6 @@
 clear;
 clc;
-I = imread("pic1.jpg");
+I = imread("D:\Twinkle\junior_first_half_year\DIP\DIP_groupwork\pic2.jpg");
 % I = imread("pic2.jpg")
 I = rgb2gray(I);  
 
@@ -11,5 +11,5 @@ DFT = abs(DFT)
 
 % imshow(uint8(DCT))
 % title("DCT");
-% imshow(uint16(DFT))
-% title("DFT");
+imshow(uint16(DFT))
+title("DFT");
