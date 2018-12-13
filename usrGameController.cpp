@@ -1,4 +1,5 @@
 #include "usrGameController.h"
+
 #define PI 3.1415926
 #ifdef VIA_OPENCV
 //构造与初始化
@@ -37,33 +38,6 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	cv::Mat pt = img(cv::Rect(0, UP_CUT, imgSize.width,imgSize.height));
 	//cv::imshow(WIN_NAME, pt);
 	 
-
-	//判断鼠标点击尺寸
-	if (argM.box.x >= 0 && argM.box.x < imgSize.width&&
-		argM.box.y >= 0 && argM.box.y < imgSize.height
-		)
-	{
-		qDebug() << "X:" << argM.box.x << " Y:" << argM.box.y;
-		qDebug() << "width:" << argM.box.width << " height:" << argM.box.height;
-		if (argM.Hit)
-		{
-			device->comHitDown();
-		}
-		double x = ((double)argM.box.x + argM.box.width) / pt.cols;
-		double y = ((double)argM.box.y + argM.box.height) / pt.rows;
-		qDebug() << "X:" << 1-y << " Y:" << x;
-		device->comMoveToScale(1-y, x);
-		argM.box.x = -1; argM.box.y = -1;
-		if (argM.Hit)
-		{
-			device->comHitUp();
-		}
-		else
-		{
-			device->comHitOnce();
-		}
-	}
-
 	//our code 
 	cv::Mat pt_gray, pt_binary, edge, parts, base, partsinv, partsAndBase;
 	int width = pt.cols;
@@ -124,30 +98,21 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	//movePen(pt_gray, contours1, centers);
 	if (flag) 
 	{
-		for (int i = 0; i < contours1.size(); i++)
+		for (int i = 1; i < contours1.size(); i++)
 		{
-			cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
-			double x = 1 - centers[i].y / pt_gray.rows;
+			double x = 0.8-centers[i].y / pt_gray.rows;
 			double y = centers[i].x / pt_gray.cols;
 			qDebug() << centerGRAY[i] << " x:" << x << " y:" << y;
+			device->comHitUp();
 			device->comMoveToScale(x, y);
-			//device->comMoveToScale(0.1, 0.1);
+			_sleep(1000);
 			device->comHitDown();
-			device->comMoveToScale(0.5, 0.5);
+			device->comMoveToScale(0.3, 0.4);
+			_sleep(1000);
 			savePicture(pt_gray,i);
 			device->comHitUp();
-			device->comMoveToScale(0, 0);
-			x = -1; y = -1;
 		}
-		/*test
-		for (int i = 0; i < contours1.size(); i++)
-		{
-			cv::circle(pt_gray, centers[i], 2, cv::Scalar(0, 255, 0));
-			qDebug() << centerGRAY[i]<<" x:"<<centers[i].x<<" y:"<<centers[i].y;
-
-		}*/
 	}
-
 
 
 	flag = false;
