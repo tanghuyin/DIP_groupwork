@@ -8,7 +8,6 @@ usrGameController::usrGameController(void* qtCD)
 	qDebug() << "usrGameController online.";
 	device = new deviceCyberDip(qtCD);//设备代理类
 	cv::namedWindow(WIN_NAME);
-	cv::setMouseCallback(WIN_NAME, mouseCallback, (void*)&(argM));
 }
 
 //析构
@@ -44,6 +43,15 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	int height = pt.rows;
 	int pixelCount[256] = { 0 };
 	int max = 0;
+	std::vector<cv::Mat> templ; // 4 is square
+	std::vector<std::vector<int>> vectorbase;
+	templ.push_back(cv::imread("D:\\DIP\\triangle1.jpg", 0));
+	templ.push_back(cv::imread("D:\\DIP\\triangle2.jpg", 0));
+	templ.push_back(cv::imread("D:\\DIP\\triangle3.jpg", 0));
+	templ.push_back(cv::imread("D:\\DIP\\triangle4.jpg", 0));
+	templ.push_back(cv::imread("D:\\DIP\\square.jpg", 0));
+	for (int i = 0; i<templ.size(); i++)
+		cv::threshold(templ[i], templ[i], 60, 255, CV_THRESH_BINARY);
 	//parts表示拼图块 base表示拼图的底盘
 	cv::cvtColor(pt, pt_gray, CV_BGR2GRAY);// transform RGB into GRAY SCALE 
 	//cv::GaussianBlur(pt_gray, pt_gray, cv::Size(5, 5), 0);
@@ -95,8 +103,8 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	std::vector<cv::Point2f> centers(contours1.size());
 	std::vector<int> centerGRAY(contours1.size());
 	findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
-	//movePen(pt_gray, contours1, centers);
-	if (flag) 
+	/*
+	if (flag)
 	{
 		for (int i = 1; i < contours1.size(); i++)
 		{
@@ -113,33 +121,179 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 			device->comHitUp();
 		}
 	}
-
-
+	*/
 	flag = false;
 	cv::bitwise_not(newpt, newpt);
-
-	
-
-	std::vector<cv::Vec4i> Lines;
-	//cv::HoughLinesP(newpt, Lines, 1, PI / 4, 2, 0, 5); // hough transform
+	// std::vector<cv::Vec4i> Lines;
 	cv::cvtColor(newpt, newpt, CV_GRAY2BGR);
-	//moveSkewLines(Lines);
-	//only for test need, can be deleted when finished
-	//addLines2Origin(newpt, Lines);
-	//
-	cv::imshow(WIN_NAME, pt_gray);
-	//cv::Mat histGraph(256, 256, CV_8U, cv::Scalar(0)); only use for one time
-	//cv::blur(pt_gray, pt_gray, cv::Size(3, 3));
-	//getTheHist(&pt_gray, histGraph);
-	//cv::imshow(WIN_NAME, histGraph);
-	//cv::Mat pt_threshold;
-	//cv::threshold(pt_gray, pt_threshold, 80, 255, CV_THRESH_BINARY);
-	//cv::imshow(WIN_NAME, pt_threshold);
 
-	//cv::imshow(WIN_NAME, edge);
+	pt_binary = pt_binary(cv::Rect(0, 80, width - 180, 550));
+
+	analog2digital(pt_binary, templ, vectorbase);
+	for (int i = 0; i < vectorbase.size(); i++)
+	{
+		for (int j = 0; j < vectorbase[i].size(); j++)
+			std::cout << vectorbase[i][j] << " ";
+		std::cout << std::endl;
+	}
+	cv::imshow(WIN_NAME, pt_binary);
+
 	return 0; 
 }
 
+void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase)
+{
+	int gray_scale;
+	cv::Mat result(img.rows, img.cols, CV_8U, cv::Scalar(0));
+	std::vector<cv::Point> triangle1;
+	std::vector<cv::Point> triangle2;
+	std::vector<cv::Point> triangle3;
+	std::vector<cv::Point> triangle4;
+	std::vector<cv::Point> square;
+	std::vector<int> vectorbaseline;
+	std::vector<std::vector<cv::Point>> LeftUp;
+	LeftUp.push_back(triangle1);
+	LeftUp.push_back(triangle2);
+	LeftUp.push_back(triangle3);
+	LeftUp.push_back(triangle4);
+	LeftUp.push_back(square);
+	std::vector<int> not_zero_row;
+	std::vector<int> not_zero_col;
+	int smallestx = 9999, smallesty = 9999;
+	float maxx = -1, maxy = -1, lastmaxx = 9999, lastmaxy = 9999, needvaluex, needvaluey;
+	for (int i = 0; i < templ.size(); i++)
+	{
+		std::cout << "=====" << std::endl;
+		findTemplLeftUp(img, templ[i], LeftUp[i], i);
+	}
+	for (int i = 0; i < LeftUp.size(); i++)
+	{
+		for (int j = 0; j < LeftUp[i].size(); j++)
+		{
+			if (LeftUp[i][j].x < smallestx)
+				smallestx = LeftUp[i][j].x;
+			if (LeftUp[i][j].y < smallesty)
+				smallesty = LeftUp[i][j].y;
+		}
+	}
+	for (int i = 0; i < LeftUp.size(); i++)
+	{
+		maxx = -1, maxy = -1, lastmaxx = 9999, lastmaxy = 9999;
+		needvaluex = 0, needvaluey = 9999;
+		for (int j = 0; j < LeftUp[i].size(); j++)
+		{
+			if (LeftUp[i][j].x > maxx)
+				maxx = LeftUp[i][j].x;
+			if (LeftUp[i][j].y > maxy)
+				maxy = LeftUp[i][j].y;
+			if (abs(LeftUp[i][j].x - needvaluex) < 5)
+				LeftUp[i][j].x += 20;
+			else if ((maxx - lastmaxx) / 50.0 >= 0.8 && ((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0 - round((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0)) >= 0.3)
+			{
+				needvaluex = LeftUp[i][j].x;
+				LeftUp[i][j].x += 20;
+			}
+			if (abs(LeftUp[i][j].y - needvaluey) < 5)
+				LeftUp[i][j].y += 20;
+			else if ((maxy - lastmaxy) / 50.0 >= 0.8 && ((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0 - round((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0)) >= 0.3)
+			{
+				needvaluey = LeftUp[i][j].y;
+				LeftUp[i][j].y += 20;
+			}
+
+
+			LeftUp[i][j].x = round((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0);
+			LeftUp[i][j].y = round((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0);
+			cv::circle(result, LeftUp[i][j], 0.5, cv::Scalar(i + 1), -1);
+			lastmaxx = maxx;
+			lastmaxy = maxy;
+		}
+	}
+	for (int i = 0; i < result.rows; i++)
+	{
+		for (int j = 0; j < result.cols; j++)
+		{
+			gray_scale = result.ptr<uchar>(i)[j];
+			if (gray_scale != 0)
+			{
+				not_zero_row.push_back(i);
+				break;
+			}
+		}
+	}
+	for (int j = 0; j < result.cols; j++)
+	{
+		for (int i = 0; i < result.rows; i++)
+		{
+			gray_scale = result.ptr<uchar>(i)[j];
+			if (gray_scale != 0)
+			{
+				not_zero_col.push_back(j);
+				break;
+			}
+		}
+	}
+	for (int i = 0; i < not_zero_row.size(); i++)
+	{
+		for (int j = 0; j < not_zero_col.size(); j++)
+		{
+			gray_scale = result.ptr<uchar>(not_zero_row[i])[not_zero_col[j]];
+			// std::cout << gray_scale << " ";
+			vectorbaseline.push_back(gray_scale);
+		}
+		vectorbase.push_back(vectorbaseline);
+		vectorbaseline.clear();
+		// std::cout << std::endl;
+	}
+}
+
+void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Pointlist, int type)
+{
+	cv::Mat out1;
+	double matchValue;
+	cv::matchTemplate(img, templ, out1, CV_TM_SQDIFF_NORMED);
+	// cv::normalize(out1, out1, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
+	bool flag_new = true;
+	for (int i = 0; i < out1.cols; i++)
+	{
+		for (int j = 0; j < out1.rows; j++)
+		{
+			matchValue = out1.at<float>(j, i);
+			if (matchValue < 0.4 && type != 4)
+			{
+				flag_new = true;
+				for (int k = 0; k < Pointlist.size(); k++)
+				{
+					if (abs(Pointlist[k].x - i) <= 20 && abs(Pointlist[k].y - j) <= 20)
+						flag_new = false;
+				}
+				if (flag_new)
+					Pointlist.push_back(cv::Point(int(i), int(j)));
+			}
+			if (matchValue < 0.3 && type == 4)
+			{
+				flag_new = true;
+				for (int k = 0; k < Pointlist.size(); k++)
+				{
+					if (abs(Pointlist[k].x - i) <= 10 && abs(Pointlist[k].y - j) <= 10)
+						flag_new = false;
+				}
+				if (flag_new)
+					Pointlist.push_back(cv::Point(int(i), int(j)));
+			}
+
+		}
+	}
+	for (int i = 0; i < Pointlist.size(); i++)
+	{
+		// std::cout << "x: " << Pointlist[i].x << " " << "y: " << Pointlist[i].y << std::endl;
+		// Pointlist[i].x = floor(Pointlist[i].x / 45);
+		// Pointlist[i].y = floor(Pointlist[i].y / 45);
+		// std::cout << "x: " << Pointlist[i].x << " " << "y: " << Pointlist[i].y << std::endl;
+
+	}
+
+}
 void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &RGB)
 {
 	std::vector<cv::Moments> mu(contours.size());
