@@ -16,6 +16,8 @@ std::vector<std::vector<cv::Point>> contours1;
 std::vector<cv::Vec4i> hierarchy1;
 std::vector<std::vector<int>> vectorbase;
 std::vector<std::vector<cv::Point>> vectorabsolute; // absolute x,y according to vectorbase
+std::vector<std::vector<std::vector<int>>> vectorparts;
+std::vector<std::vector<std::vector<cv::Point>>> vectorabsolute_parts;
 cv::Mat pt_gray_start_of_the_game;
 cv::Mat parts_for_vec;
 //构造与初始化
@@ -95,15 +97,11 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 		// ===== end finding =====
 		// ===== start finding the parts contour =====
 		cv::findContours(partsinv, contours1, hierarchy1, CV_RETR_TREE, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
-		// for (int i = 1; i < contours1.size(); i++)
-		//{
-			//if (hierarchy1[i][3] != -1)
-				//cv::drawContours(newpt, contours1, i, cv::Scalar(255), 1, 8);
-		//}
 		// ===== end finding =====
 		//======== vectorize base start=======
+		std::cout << "========= Start getting the vector of the base ========" << std::endl;
 		pt_binary = pt_binary(cv::Rect(0, 80, width - 180, 550));
-		analog2digital(pt_binary, templ, vectorbase, vectorabsolute);
+		analog2digital(pt_binary, templ, vectorbase, vectorabsolute, true);
 		chubbyVector(vectorabsolute);
 		for (int i = 0; i < vectorbase.size(); i++)
 		{
@@ -116,7 +114,8 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 			for (int j = 0; j < vectorbase[i].size(); j++)
 				std::cout << "x:" << vectorabsolute[i][j].x << "y:" << vectorabsolute[i][j].y;
 			std::cout << std::endl;
-		}	
+		}
+		std::cout << "========= Finish getting the vector of the base ========" << std::endl;
 		//======== vectorize base end=========
 	}
 	
@@ -132,6 +131,7 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	// ===== start the control of DIP ======
 	if (partsnum < contours1.size() - 1 && get_parts)
 	{
+		new_game = false; // just for test, need to revise
 		double x;
 		double y;
 		qDebug() << "lastx:" << lastx << "lasty:" << lasty;
@@ -170,29 +170,54 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 		get_parts_vector = true;
 		get_parts = false;
 	}
-	else
-	{
-		// start finding the answer.....                %TODO
-		// move the parts to correct place
-		// new_game = true
-	}
 	// ===== end =====
 
 	// ===== start get the vector of the parts =====
 	while (get_parts_vector == true)
 	{
+		std::cout << "============Start getting the vector of parts===============" << std::endl;
+		std::cout << "There are " << partsnum - 1 << " in this game" << std::endl;
+		std::vector<std::vector<int>> vectorparts_one;
+		std::vector<std::vector<cv::Point>> vectorabsolute_parts_one;
 		for (int i = 1; i < partsnum; i++)
 		{
+			std::cout << "Start processing " << i << " parts" << std::endl;
 			read_file = "D:\\DIP\\qtCyberDIP\\qtCyberDip\\parts" + std::to_string(i) + ".jpg";
 			parts_for_vec = cv::imread(read_file, 0);
 			cv::blur(parts_for_vec, parts_for_vec, cv::Size(2, 2));
 			cv::threshold(parts_for_vec, parts_for_vec, 30, 255, CV_THRESH_BINARY);
-			analog2digital(parts_for_vec, templ, vectorbase, vectorabsolute);
+			analog2digital(parts_for_vec, templ, vectorparts_one, vectorabsolute_parts_one, false);
+			chubbyVector(vectorabsolute_parts_one);
+			for (int j = 0; j < vectorparts_one.size(); j++)
+			{
+				for (int k = 0; k < vectorparts_one[j].size(); k++)
+				{
+					std::cout << vectorparts_one[j][k];
+				}	
+				std::cout << std::endl;
+			}
+			for (int j = 0; j < vectorabsolute_parts_one.size(); j++)
+			{
+				for (int k = 0; k < vectorabsolute_parts_one[j].size(); k++)
+				{
+					std::cout << "x: " << vectorabsolute_parts_one[j][k].x << "y: " << vectorabsolute_parts_one[j][k].y;
+				}
+				std::cout << std::endl;
+			}
+			vectorabsolute_parts.push_back(vectorabsolute_parts_one);
+			vectorparts.push_back(vectorparts_one);
+			vectorparts_one.clear();
+			vectorabsolute_parts_one.clear();
+			std::cout << "Finish processing " << i << " parts" << std::endl;
 		}
+		std::cout << "============Finish getting the vector of parts===============" << std::endl;
+		get_parts_vector = false;
 	}
-		
 	// ===== end =====
-	new_game = false; // just for test, need to revise
+
+	// start finding the answer.....                %TODO
+	// move the parts to correct place
+	// new_game = true
 	
 	cv::imshow(WIN_NAME, pt_binary);
 
@@ -235,7 +260,7 @@ void chubbyVector(std::vector<std::vector<cv::Point>> &vectorabsolute)
 	}
 }
 
-void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase, std::vector<std::vector<cv::Point>> &vectorabsolute)
+void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase, std::vector<std::vector<cv::Point>> &vectorabsolute, bool isBase)
 {
 	int gray_scale;
 	cv::Mat result(img.rows, img.cols, CV_8U, cv::Scalar(0));
@@ -261,8 +286,8 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 	float maxx = -1, maxy = -1, lastmaxx = 9999, lastmaxy = 9999, needvaluex, needvaluey;
 	for (int i = 0; i < templ.size(); i++)
 	{
-		std::cout << "=====" << std::endl;
-		findTemplLeftUp(img, templ[i], LeftUp[i], i);
+		std::cout << "=====" << i + 1 << "=====" << std::endl;
+		findTemplLeftUp(img, templ[i], LeftUp[i], i, isBase);
 	}
 
 	for (int i = 0; i < 30; i++)
@@ -317,14 +342,15 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			normalized_x = round((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0);
 			normalized_y = round((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0);
 			LeftUpAbs[normalized_x][normalized_y].x = LeftUp[i][j].x;
-			LeftUpAbs[normalized_x][normalized_y].y = LeftUp[i][j].y + 80; // something was cut
+			if (isBase)
+				LeftUpAbs[normalized_x][normalized_y].y = LeftUp[i][j].y + 80; // something was cut
+			else
+				LeftUpAbs[normalized_x][normalized_y].y = LeftUp[i][j].y;
 			cv::circle(result, cv::Point(normalized_x, normalized_y), 0.5, cv::Scalar(i + 1), -1);
 			lastmaxx = maxx;
 			lastmaxy = maxy;
 		}
 	}
-
-
 
 	for (int i = 0; i < result.rows; i++)
 	{
@@ -338,6 +364,7 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			}	
 		}
 	}
+
 	for (int j = 0; j < result.cols; j++)
 	{
 		for (int i = 0; i < result.rows; i++)
@@ -350,8 +377,6 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			}
 		}
 	}
-
-
 
 	for (int i = 0; i < not_zero_row.size(); i++)
 	{
@@ -371,7 +396,7 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 	}
 }
 
-void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Pointlist, int type)
+void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Pointlist, int type, bool isBase)
 {
 	cv::Mat out1;
 	double matchValue;
@@ -383,29 +408,56 @@ void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Point
 		for (int j = 0; j < out1.rows; j++)
 		{
 			matchValue = out1.at<float>(j, i);
-			if (matchValue < 0.4 && type != 4)
+			if (isBase)
 			{
-				flag_new = true;
-				for (int k = 0; k < Pointlist.size(); k++)
+				if (matchValue < 0.4 && type != 4)
 				{
-					if (abs(Pointlist[k].x - i) <= 20 && abs(Pointlist[k].y - j) <= 20)
-						flag_new = false;
+					flag_new = true;
+					for (int k = 0; k < Pointlist.size(); k++)
+					{
+						if (abs(Pointlist[k].x - i) <= 20 && abs(Pointlist[k].y - j) <= 20)
+							flag_new = false;
+					}
+					if (flag_new)
+						Pointlist.push_back(cv::Point(int(i), int(j)));
 				}
-				if (flag_new)
-					Pointlist.push_back(cv::Point(int(i), int(j)));
+				if (matchValue < 0.3 && type == 4)
+				{
+					flag_new = true;
+					for (int k = 0; k < Pointlist.size(); k++)
+					{
+						if (abs(Pointlist[k].x - i) <= 10 && abs(Pointlist[k].y - j) <= 10)
+							flag_new = false;
+					}
+					if (flag_new)
+						Pointlist.push_back(cv::Point(int(i), int(j)));
+				}
 			}
-			if (matchValue < 0.3 && type == 4)
+			else
 			{
-				flag_new = true;
-				for (int k = 0; k < Pointlist.size(); k++)
+				if (matchValue < 0.2 && type != 4)
 				{
-					if (abs(Pointlist[k].x - i) <= 10 && abs(Pointlist[k].y - j) <= 10)
-						flag_new = false;
+					flag_new = true;
+					for (int k = 0; k < Pointlist.size(); k++)
+					{
+						if (abs(Pointlist[k].x - i) <= 20 && abs(Pointlist[k].y - j) <= 20)
+							flag_new = false;
+					}
+					if (flag_new)
+						Pointlist.push_back(cv::Point(int(i), int(j)));
 				}
-				if (flag_new)
-					Pointlist.push_back(cv::Point(int(i), int(j)));
-			}
-
+				if (matchValue < 0.2 && type == 4)
+				{
+					flag_new = true;
+					for (int k = 0; k < Pointlist.size(); k++)
+					{
+						if (abs(Pointlist[k].x - i) <= 10 && abs(Pointlist[k].y - j) <= 10)
+							flag_new = false;
+					}
+					if (flag_new)
+						Pointlist.push_back(cv::Point(int(i), int(j)));
+				}
+			}		
 		}
 	}
 	for (int i = 0; i < Pointlist.size(); i++)
@@ -440,33 +492,6 @@ void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours
 	for (int i = 0; i < contours.size(); i++)
 	{
 		RGB[i] = img.ptr<uchar>(int(centers[i].y))[int(centers[i].x)];
-	}
-	return;
-}
-
-void findCenterAndRGB_2(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &B, std::vector<int> &G, std::vector<int> &R)
-{
-	std::vector<cv::Moments> mu(contours.size());
-	int grayscale;
-	for (int i = 0; i < contours.size(); i++)
-	{
-		mu[i] = cv::moments(contours[i], true);
-	}
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		centers[i] = cv::Point2f(round(mu[i].m10 / mu[i].m00), round(mu[i].m01 / mu[i].m00)); // get the center of each parts
-	}
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		centers[i].y += 450; // get the absolute coordinates before cutting the screen
-	}
-	for (int i = 0; i < contours.size(); i++)
-	{
-		B[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[0];
-		G[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[1];
-		R[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[2];
 	}
 	return;
 }
@@ -553,30 +578,6 @@ void getTheHist(cv::Mat *img, cv::Mat &dstImage)
 	}
 }
 
-void removeOtherRGB(cv::Mat &pt, int B_target, int G_target, int R_target)
-{
-	int B, G, R;
-	for (int i = 0; i < pt.rows; i++)
-		for (int j = 0; j < pt.cols; j++)
-		{
-			B = pt.at<cv::Vec3b>(i, j)[0];
-			G = pt.at<cv::Vec3b>(i, j)[1];
-			R = pt.at<cv::Vec3b>(i, j)[2];
-			if (B == B_target && G == G_target && R == R_target)
-			{
-				pt.at<cv::Vec3b>(i, j)[0] = 0;
-				pt.at<cv::Vec3b>(i, j)[1] = 0;
-				pt.at<cv::Vec3b>(i, j)[2] = 0;
-			}
-			else
-			{
-				pt.at<cv::Vec3b>(i, j)[0] = 255;
-				pt.at<cv::Vec3b>(i, j)[1] = 255;
-				pt.at<cv::Vec3b>(i, j)[2] = 255;
-			}
-		}
-	return;
-}
 
 
 //鼠标回调函数
