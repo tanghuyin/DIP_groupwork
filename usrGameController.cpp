@@ -1,16 +1,32 @@
-#include "usrGameController.h"
-
+Ôªø#include "usrGameController.h"
+#include <string>
 #define PI 3.1415926
 #ifdef VIA_OPENCV
-//ππ‘Ï”Î≥ı ºªØ
+
+bool flag = true;
+bool new_game = true;
+bool get_parts_vector = false;
+bool get_parts = true;
+int partsnum = 0;
+double lastx = 0, lasty = 0;
+std::string read_file;
+std::vector<std::vector<cv::Point>> contours;
+std::vector<cv::Vec4i> hierarchy;
+std::vector<std::vector<cv::Point>> contours1;
+std::vector<cv::Vec4i> hierarchy1;
+std::vector<std::vector<int>> vectorbase;
+std::vector<std::vector<cv::Point>> vectorabsolute; // absolute x,y according to vectorbase
+cv::Mat pt_gray_start_of_the_game;
+cv::Mat parts_for_vec;
+//ÊûÑÈÄ†‰∏éÂàùÂßãÂåñ
 usrGameController::usrGameController(void* qtCD)
 {
 	qDebug() << "usrGameController online.";
-	device = new deviceCyberDip(qtCD);//…Ë±∏¥˙¿Ì¿‡
+	device = new deviceCyberDip(qtCD);//ËÆæÂ§á‰ª£ÁêÜÁ±ª
 	cv::namedWindow(WIN_NAME);
 }
 
-//Œˆππ
+//ÊûêÊûÑ
 usrGameController::~usrGameController()
 {
 	cv::destroyAllWindows();
@@ -21,9 +37,7 @@ usrGameController::~usrGameController()
 	qDebug() << "usrGameController offline.";
 }
 
-bool flag = true;
-int i1 = 0;
-//¥¶¿ÌÕºœÒ 
+//Â§ÑÁêÜÂõæÂÉè 
 int usrGameController::usrProcessImage(cv::Mat& img)
 {
 	cv::Size imgSize(img.cols, img.rows - UP_CUT);
@@ -33,7 +47,7 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 		return -1;
 	}
 
-	//Ωÿ»°ÕºœÒ±ﬂ‘µ
+	//Êà™ÂèñÂõæÂÉèËæπÁºò
 	cv::Mat pt = img(cv::Rect(0, UP_CUT, imgSize.width,imgSize.height));
 	//cv::imshow(WIN_NAME, pt);
 	 
@@ -44,15 +58,15 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	int pixelCount[256] = { 0 };
 	int max = 0;
 	std::vector<cv::Mat> templ; // 4 is square
-	std::vector<std::vector<int>> vectorbase;
+	
 	templ.push_back(cv::imread("D:\\DIP\\triangle1.jpg", 0));
 	templ.push_back(cv::imread("D:\\DIP\\triangle2.jpg", 0));
 	templ.push_back(cv::imread("D:\\DIP\\triangle3.jpg", 0));
 	templ.push_back(cv::imread("D:\\DIP\\triangle4.jpg", 0));
 	templ.push_back(cv::imread("D:\\DIP\\square.jpg", 0));
-	for (int i = 0; i<templ.size(); i++)
+	for (int i = 0; i < templ.size(); i++)
 		cv::threshold(templ[i], templ[i], 60, 255, CV_THRESH_BINARY);
-	//parts±Ì æ∆¥ÕºøÈ base±Ì æ∆¥Õºµƒµ◊≈Ã
+	//partsË°®Á§∫ÊãºÂõæÂùó baseË°®Á§∫ÊãºÂõæÁöÑÂ∫ïÁõò
 	cv::cvtColor(pt, pt_gray, CV_BGR2GRAY);// transform RGB into GRAY SCALE 
 	//cv::GaussianBlur(pt_gray, pt_gray, cv::Size(5, 5), 0);
 	cv::threshold(pt_gray, pt_binary, 60, 255, CV_THRESH_BINARY); // move puzzles only leave the puzzle base(including lines)
@@ -67,91 +81,174 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	bitwise_not(pt_binary, pt_binary);
 
 
-	std::vector<std::vector<cv::Point>> contours;
-	std::vector<cv::Vec4i> hierarchy;
-	std::vector<std::vector<cv::Point>> contours1;
-	std::vector<cv::Vec4i> hierarchy1;
-	
-
-	// base contours
-	cv::findContours(pt_binary, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
-	cv::Mat newpt(pt_binary.rows, pt_binary.cols, CV_8U, cv::Scalar(0));
-	for (int i = 0; i < contours.size(); i++)
+	if (new_game)
 	{
-		if (hierarchy[i][3] != -1)
-			cv::drawContours(pt_binary, contours, i, cv::Scalar(0, 255, 0), 2, 8);
+		pt_gray_start_of_the_game = pt_gray;
+		// ===== start finding base contour ======
+		cv::findContours(pt_binary, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+		// cv::Mat newpt(pt_binary.rows, pt_binary.cols, CV_8U, cv::Scalar(0));
+		for (int i = 0; i < contours.size(); i++)
+		{
+			if (hierarchy[i][3] != -1)
+				cv::drawContours(pt_binary, contours, i, cv::Scalar(0, 255, 0), 2, 8);
+		}
+		// ===== end finding =====
+		// ===== start finding the parts contour =====
+		cv::findContours(partsinv, contours1, hierarchy1, CV_RETR_TREE, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
+		// for (int i = 1; i < contours1.size(); i++)
+		//{
+			//if (hierarchy1[i][3] != -1)
+				//cv::drawContours(newpt, contours1, i, cv::Scalar(255), 1, 8);
+		//}
+		// ===== end finding =====
+		//======== vectorize base start=======
+		pt_binary = pt_binary(cv::Rect(0, 80, width - 180, 550));
+		analog2digital(pt_binary, templ, vectorbase, vectorabsolute);
+		chubbyVector(vectorabsolute);
+		for (int i = 0; i < vectorbase.size(); i++)
+		{
+			for (int j = 0; j < vectorbase[i].size(); j++)
+				std::cout << vectorbase[i][j] << " ";
+			std::cout << std::endl;
+		}
+		for (int i = 0; i < vectorbase.size(); i++)
+		{
+			for (int j = 0; j < vectorbase[i].size(); j++)
+				std::cout << "x:" << vectorabsolute[i][j].x << "y:" << vectorabsolute[i][j].y;
+			std::cout << std::endl;
+		}	
+		//======== vectorize base end=========
 	}
 	
-	/*
-	cv::Mat element(8, 8, CV_8U, cv::Scalar(1));
-	cv::GaussianBlur(partsinv, partsinv, cv::Size(3, 3), 0);
-	cv::morphologyEx(partsinv, partsinv, cv::MORPH_CLOSE, element);
-	cv::morphologyEx(partsinv, partsinv, cv::MORPH_OPEN, element);
-	cv::Canny(partsinv, edge, 5, 10, 3);
-	bitwise_not(edge, edge);
-	*/
-
-	// find the parts contour
-	cv::findContours(partsinv, contours1, hierarchy1, CV_RETR_TREE, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
-	for (int i = 1; i < contours1.size(); i++)
-	{	
-		if (hierarchy1[i][3] != -1)
-			cv::drawContours(newpt, contours1, i, cv::Scalar(255), 1, 8);
-		
-	}
-
+	// ===== rely on contours1.size() so ..... =====
 	std::vector<cv::Point2f> centers(contours1.size());
 	std::vector<int> centerGRAY(contours1.size());
-	findCenterAndRGB(pt_gray, contours1, centers, centerGRAY);
-	/*
-	if (flag)
+	std::vector<int> target_B(contours1.size());
+	std::vector<int> target_G(contours1.size());
+	std::vector<int> target_R(contours1.size());
+	findCenterAndRGB(pt_gray_start_of_the_game, contours1, centers, centerGRAY);
+	// ===== end =====
+
+	// ===== start the control of DIP ======
+	if (partsnum < contours1.size() - 1 && get_parts)
 	{
-		for (int i = 1; i < contours1.size(); i++)
+		double x;
+		double y;
+		qDebug() << "lastx:" << lastx << "lasty:" << lasty;
+		if (partsnum != 0)
 		{
-			double x = 0.8-centers[i].y / pt_gray.rows;
-			double y = centers[i].x / pt_gray.cols;
-			qDebug() << centerGRAY[i] << " x:" << x << " y:" << y;
-			device->comHitUp();
-			device->comMoveToScale(x, y);
+			removeOtherGrayScale(pt_gray, centerGRAY[partsnum]);
+			bitwise_not(pt_gray, pt_gray);
+			// savePicture(pt_gray, partsnum);
+			device->comMoveToScale(lastx, lasty);
 			_sleep(1000);
-			device->comHitDown();
-			device->comMoveToScale(0.3, 0.4);
-			_sleep(1000);
-			savePicture(pt_gray,i);
 			device->comHitUp();
 		}
+		partsnum++;
+		x = 0.8 - centers[partsnum].y / pt_gray.rows;
+		y = centers[partsnum].x / pt_gray.cols;
+		lastx = x;
+		lasty = y;
+		qDebug() << centerGRAY[partsnum] << " x:" << x << " y:" << y;
+		device->comHitUp();
+		device->comMoveToScale(x, y);
+		_sleep(1000);
+		device->comHitDown();
+		device->comMoveToScale(0.25, 0.4);
+		_sleep(1000);
 	}
-	*/
-	flag = false;
-	cv::bitwise_not(newpt, newpt);
-	// std::vector<cv::Vec4i> Lines;
-	cv::cvtColor(newpt, newpt, CV_GRAY2BGR);
-
-	pt_binary = pt_binary(cv::Rect(0, 80, width - 180, 550));
-
-	analog2digital(pt_binary, templ, vectorbase);
-	for (int i = 0; i < vectorbase.size(); i++)
+	else if (partsnum == contours1.size() - 1 && get_parts)
 	{
-		for (int j = 0; j < vectorbase[i].size(); j++)
-			std::cout << vectorbase[i][j] << " ";
-		std::cout << std::endl;
+		removeOtherGrayScale(pt_gray, centerGRAY[partsnum]);
+		bitwise_not(pt_gray, pt_gray);
+		// savePicture(pt_gray, partsnum);
+		device->comMoveToScale(lastx, lasty);
+		_sleep(1000);
+		device->comHitUp();
+		device->comMoveToScale(0, 0);
+		partsnum++;
+		get_parts_vector = true;
+		get_parts = false;
 	}
+	else
+	{
+		// start finding the answer.....                %TODO
+		// move the parts to correct place
+		// new_game = true
+	}
+	// ===== end =====
+
+	// ===== start get the vector of the parts =====
+	while (get_parts_vector == true)
+	{
+		for (int i = 1; i < partsnum; i++)
+		{
+			read_file = "D:\\DIP\\qtCyberDIP\\qtCyberDip\\parts" + std::to_string(i) + ".jpg";
+			parts_for_vec = cv::imread(read_file, 0);
+			cv::blur(parts_for_vec, parts_for_vec, cv::Size(2, 2));
+			cv::threshold(parts_for_vec, parts_for_vec, 30, 255, CV_THRESH_BINARY);
+			analog2digital(parts_for_vec, templ, vectorbase, vectorabsolute);
+		}
+	}
+		
+	// ===== end =====
+	new_game = false; // just for test, need to revise
+	
 	cv::imshow(WIN_NAME, pt_binary);
 
 	return 0; 
 }
 
-void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase)
+void chubbyVector(std::vector<std::vector<cv::Point>> &vectorabsolute)
+{
+	int height = vectorabsolute.size();
+	int width = vectorabsolute[0].size();
+	std::vector<int> ref_X(width);
+	std::vector<int> ref_Y(height);
+	for (int i = 0; i < vectorabsolute.size(); i++)
+	{
+		for (int j = 0; j < vectorabsolute[i].size(); j++)
+		{
+			if (vectorabsolute[i][j].x != 0)
+			{
+				ref_X[j] = vectorabsolute[i][j].x;
+			}
+			if (vectorabsolute[i][j].y != 0)
+			{
+				ref_Y[i] = vectorabsolute[i][j].y;
+			}
+		}
+	}
+	for (int i = 0; i < vectorabsolute.size(); i++)
+	{
+		for (int j = 0; j < vectorabsolute[i].size(); j++)
+		{
+			if (vectorabsolute[i][j].x == 0)
+			{
+				vectorabsolute[i][j].x = ref_X[j];
+			}
+			if (vectorabsolute[i][j].y == 0)
+			{
+				vectorabsolute[i][j].y = ref_Y[i];
+			}
+		}
+	}
+}
+
+void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase, std::vector<std::vector<cv::Point>> &vectorabsolute)
 {
 	int gray_scale;
 	cv::Mat result(img.rows, img.cols, CV_8U, cv::Scalar(0));
+	cv::Point test;
 	std::vector<cv::Point> triangle1;
 	std::vector<cv::Point> triangle2;
 	std::vector<cv::Point> triangle3;
 	std::vector<cv::Point> triangle4;
 	std::vector<cv::Point> square;
 	std::vector<int> vectorbaseline;
+	std::vector<cv::Point> vectorabsoluteline;
 	std::vector<std::vector<cv::Point>> LeftUp;
+	std::vector<std::vector<cv::Point>> LeftUpAbs(30);
 	LeftUp.push_back(triangle1);
 	LeftUp.push_back(triangle2);
 	LeftUp.push_back(triangle3);
@@ -160,12 +257,26 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 	std::vector<int> not_zero_row;
 	std::vector<int> not_zero_col;
 	int smallestx = 9999, smallesty = 9999;
+	int normalized_x, normalized_y;
 	float maxx = -1, maxy = -1, lastmaxx = 9999, lastmaxy = 9999, needvaluex, needvaluey;
 	for (int i = 0; i < templ.size(); i++)
 	{
 		std::cout << "=====" << std::endl;
 		findTemplLeftUp(img, templ[i], LeftUp[i], i);
 	}
+
+	for (int i = 0; i < 30; i++)
+	{
+		for (int j = 0; j < 30; j++)
+			LeftUpAbs[i].push_back(cv::Point(0, 0));
+	}
+	/*
+	for (int i = 0; i < 30; i++)
+	{
+		for (int j = 0; j < 30; j++)
+			vectorabsolute[i].push_back(cv::Point(0, 0));
+	}
+	*/
 	for (int i = 0; i < LeftUp.size(); i++)
 	{
 		for (int j = 0; j < LeftUp[i].size(); j++)
@@ -175,7 +286,9 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			if (LeftUp[i][j].y < smallesty)
 				smallesty = LeftUp[i][j].y;
 		}
-	}
+	}	
+
+
 	for (int i = 0; i < LeftUp.size(); i++)
 	{
 		maxx = -1, maxy = -1, lastmaxx = 9999, lastmaxy = 9999;
@@ -200,15 +313,19 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 				needvaluey = LeftUp[i][j].y;
 				LeftUp[i][j].y += 20;
 			}
-
-
-			LeftUp[i][j].x = round((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0);
-			LeftUp[i][j].y = round((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0);
-			cv::circle(result, LeftUp[i][j], 0.5, cv::Scalar(i + 1), -1);
+			
+			normalized_x = round((LeftUp[i][j].x / 10.0 - smallestx / 10.0) / 5.0);
+			normalized_y = round((LeftUp[i][j].y / 10.0 - smallesty / 10.0) / 5.0);
+			LeftUpAbs[normalized_x][normalized_y].x = LeftUp[i][j].x;
+			LeftUpAbs[normalized_x][normalized_y].y = LeftUp[i][j].y + 80; // something was cut
+			cv::circle(result, cv::Point(normalized_x, normalized_y), 0.5, cv::Scalar(i + 1), -1);
 			lastmaxx = maxx;
 			lastmaxy = maxy;
 		}
 	}
+
+
+
 	for (int i = 0; i < result.rows; i++)
 	{
 		for (int j = 0; j < result.cols; j++)
@@ -218,7 +335,7 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			{
 				not_zero_row.push_back(i);
 				break;
-			}
+			}	
 		}
 	}
 	for (int j = 0; j < result.cols; j++)
@@ -233,6 +350,9 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			}
 		}
 	}
+
+
+
 	for (int i = 0; i < not_zero_row.size(); i++)
 	{
 		for (int j = 0; j < not_zero_col.size(); j++)
@@ -240,9 +360,13 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 			gray_scale = result.ptr<uchar>(not_zero_row[i])[not_zero_col[j]];
 			// std::cout << gray_scale << " ";
 			vectorbaseline.push_back(gray_scale);
+			vectorabsoluteline.push_back(LeftUpAbs[not_zero_col[j]][not_zero_row[i]]);
+			
 		}
 		vectorbase.push_back(vectorbaseline);
+		vectorabsolute.push_back(vectorabsoluteline);
 		vectorbaseline.clear();
+		vectorabsoluteline.clear();
 		// std::cout << std::endl;
 	}
 }
@@ -286,7 +410,7 @@ void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Point
 	}
 	for (int i = 0; i < Pointlist.size(); i++)
 	{
-		// std::cout << "x: " << Pointlist[i].x << " " << "y: " << Pointlist[i].y << std::endl;
+		std::cout << "x: " << Pointlist[i].x << " " << "y: " << Pointlist[i].y << std::endl;
 		// Pointlist[i].x = floor(Pointlist[i].x / 45);
 		// Pointlist[i].y = floor(Pointlist[i].y / 45);
 		// std::cout << "x: " << Pointlist[i].x << " " << "y: " << Pointlist[i].y << std::endl;
@@ -294,6 +418,7 @@ void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Point
 	}
 
 }
+
 void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &RGB)
 {
 	std::vector<cv::Moments> mu(contours.size());
@@ -319,21 +444,55 @@ void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours
 	return;
 }
 
-
-void savePicture(cv::Mat img, int i)
+void findCenterAndRGB_2(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &B, std::vector<int> &G, std::vector<int> &R)
 {
-	switch (i)
+	std::vector<cv::Moments> mu(contours.size());
+	int grayscale;
+	for (int i = 0; i < contours.size(); i++)
 	{
-	case  1:cv::imwrite("contours1.jpg", img); break;
-	case  2:cv::imwrite("contours2.jpg", img); break;
-	case  3:cv::imwrite("contours3.jpg", img); break;
-	case  4:cv::imwrite("contours4.jpg", img); break;
-	case  5:cv::imwrite("contours5.jpg", img); break;
-	case  6:cv::imwrite("contours6.jpg", img); break;
-	case  0:cv::imwrite("base.jpg", img); break;
+		mu[i] = cv::moments(contours[i], true);
+	}
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		centers[i] = cv::Point2f(round(mu[i].m10 / mu[i].m00), round(mu[i].m01 / mu[i].m00)); // get the center of each parts
+	}
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		centers[i].y += 450; // get the absolute coordinates before cutting the screen
+	}
+	for (int i = 0; i < contours.size(); i++)
+	{
+		B[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[0];
+		G[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[1];
+		R[i] = img.at<cv::Vec3b>(int(centers[i].y), int(centers[i].x))[2];
 	}
 	return;
 }
+
+void savePicture(cv::Mat img, int i)
+{
+	std::string filename = "parts" + std::to_string(i) + ".jpg";
+	cv::imwrite(filename, img);
+	return;
+}
+
+void removeOtherGrayScale(cv::Mat &gray_pt, int target_gray_scale)
+{
+	int gray_scale;
+	for (int i = 0; i<gray_pt.rows; i++)
+		for (int j = 0; j < gray_pt.cols; j++)
+		{
+			gray_scale = gray_pt.ptr<uchar>(i)[j];
+			if (abs(gray_scale - target_gray_scale) <= 1)
+				gray_pt.ptr<uchar>(i)[j] = 0;
+			else
+				gray_pt.ptr<uchar>(i)[j] = 255;
+		}
+	return;
+}
+
 int get_max(int array1[], int n)
 {
 	int max = array1[0];
@@ -346,6 +505,7 @@ int get_max(int array1[], int n)
 		}
 	return index;
 }
+
 void addLines2Origin(cv::Mat &origin, std::vector<cv::Vec4i> &Lines)
 {
 	qDebug() << Lines.size();
@@ -370,6 +530,7 @@ void moveSkewLines(std::vector<cv::Vec4i> &Lines)
 			i++;
 	}
 }
+
 void getTheHist(cv::Mat *img, cv::Mat &dstImage)
 {
 	const int nimages = 1;
@@ -392,13 +553,39 @@ void getTheHist(cv::Mat *img, cv::Mat &dstImage)
 	}
 }
 
-// Û±Íªÿµ˜∫Ø ˝
+void removeOtherRGB(cv::Mat &pt, int B_target, int G_target, int R_target)
+{
+	int B, G, R;
+	for (int i = 0; i < pt.rows; i++)
+		for (int j = 0; j < pt.cols; j++)
+		{
+			B = pt.at<cv::Vec3b>(i, j)[0];
+			G = pt.at<cv::Vec3b>(i, j)[1];
+			R = pt.at<cv::Vec3b>(i, j)[2];
+			if (B == B_target && G == G_target && R == R_target)
+			{
+				pt.at<cv::Vec3b>(i, j)[0] = 0;
+				pt.at<cv::Vec3b>(i, j)[1] = 0;
+				pt.at<cv::Vec3b>(i, j)[2] = 0;
+			}
+			else
+			{
+				pt.at<cv::Vec3b>(i, j)[0] = 255;
+				pt.at<cv::Vec3b>(i, j)[1] = 255;
+				pt.at<cv::Vec3b>(i, j)[2] = 255;
+			}
+		}
+	return;
+}
+
+
+//Èº†Ê†áÂõûË∞ÉÂáΩÊï∞
 void mouseCallback(int event, int x, int y, int flags, void*param)
 {
 	usrGameController::MouseArgs* m_arg = (usrGameController::MouseArgs*)param;
 	switch (event)
 	{
-	case CV_EVENT_MOUSEMOVE: //  Û±Í“∆∂Ø ±
+	case CV_EVENT_MOUSEMOVE: // Èº†Ê†áÁßªÂä®Êó∂
 	{
 		if (m_arg->Drawing)
 		{
@@ -407,14 +594,14 @@ void mouseCallback(int event, int x, int y, int flags, void*param)
 		}
 	}
 	break;
-	case CV_EVENT_LBUTTONDOWN:case CV_EVENT_RBUTTONDOWN: // ◊Û/”“º¸∞¥œ¬
+	case CV_EVENT_LBUTTONDOWN:case CV_EVENT_RBUTTONDOWN: // Â∑¶/Âè≥ÈîÆÊåâ‰∏ã
 	{
 		m_arg->Hit = event == CV_EVENT_RBUTTONDOWN;
 		m_arg->Drawing = true;
 		m_arg->box = cvRect(x, y, 0, 0);
 	}
 	break;
-	case CV_EVENT_LBUTTONUP:case CV_EVENT_RBUTTONUP: // ◊Û/”“º¸µØ∆
+	case CV_EVENT_LBUTTONUP:case CV_EVENT_RBUTTONUP: // Â∑¶/Âè≥ÈîÆÂºπËµ∑
 	{
 		m_arg->Hit = false;
 		m_arg->Drawing = false;

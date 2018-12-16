@@ -36,6 +36,7 @@ public:
 	int usrProcessImage(cv::Mat& img);
 };
 
+
 //以下是为了实现演示效果，增加的内容
 //鼠标回调函数
 void  mouseCallback(int event, int x, int y, int flags, void*param);
@@ -46,7 +47,11 @@ void addLines2Origin(cv::Mat &origin, std::vector<cv::Vec4i> &Lines);
 int get_max(int array1[], int n);
 void findCenterAndRGB(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &RGB);
 void savePicture(cv::Mat img, int i);
-void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase);
+void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::vector<int>> &vectorbase, std::vector<std::vector<cv::Point>> &vectorabsolute);
+void chubbyVector(std::vector<std::vector<cv::Point>> &vectorabsolute);
 void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Pointlist, int type);
+void removeOtherGrayScale(cv::Mat &gray_pt, int target_gray_scale);
+void findCenterAndRGB_2(cv::Mat img, std::vector<std::vector<cv::Point>> &contours, std::vector<cv::Point2f> &centers, std::vector<int> &B, std::vector<int> &G, std::vector<int> &R);
+void removeOtherRGB(cv::Mat &pt, int B_target, int G_target, int R_target);
 #endif
 #endif
