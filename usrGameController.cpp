@@ -7,6 +7,7 @@ bool flag = true;
 bool new_game = true;
 bool get_parts_vector = false;
 bool get_parts = true;
+bool find_solution = false;
 int partsnum = 0;
 double lastx = 0, lasty = 0;
 std::string read_file;
@@ -18,6 +19,7 @@ std::vector<std::vector<int>> vectorbase;
 std::vector<std::vector<cv::Point>> vectorabsolute; // absolute x,y according to vectorbase
 std::vector<std::vector<std::vector<int>>> vectorparts;
 std::vector<std::vector<std::vector<cv::Point>>> vectorabsolute_parts;
+std::vector<std::vector<int>> vectorsolution;
 cv::Mat pt_gray_start_of_the_game;
 cv::Mat parts_for_vec;
 //构造与初始化
@@ -122,9 +124,6 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	// ===== rely on contours1.size() so ..... =====
 	std::vector<cv::Point2f> centers(contours1.size());
 	std::vector<int> centerGRAY(contours1.size());
-	std::vector<int> target_B(contours1.size());
-	std::vector<int> target_G(contours1.size());
-	std::vector<int> target_R(contours1.size());
 	findCenterAndRGB(pt_gray_start_of_the_game, contours1, centers, centerGRAY);
 	// ===== end =====
 
@@ -139,8 +138,8 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 		{
 			removeOtherGrayScale(pt_gray, centerGRAY[partsnum]);
 			bitwise_not(pt_gray, pt_gray);
-			// savePicture(pt_gray, partsnum);
-			device->comMoveToScale(lastx, lasty);
+			savePicture(pt_gray, partsnum);
+			device->comMoveToScale(0, 0);
 			_sleep(1000);
 			device->comHitUp();
 		}
@@ -161,11 +160,11 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	{
 		removeOtherGrayScale(pt_gray, centerGRAY[partsnum]);
 		bitwise_not(pt_gray, pt_gray);
-		// savePicture(pt_gray, partsnum);
-		device->comMoveToScale(lastx, lasty);
+		savePicture(pt_gray, partsnum);
+		device->comMoveToScale(0, 0);
 		_sleep(1000);
 		device->comHitUp();
-		device->comMoveToScale(0, 0);
+		// device->comMoveToScale(0, 0);
 		partsnum++;
 		get_parts_vector = true;
 		get_parts = false;
@@ -188,6 +187,7 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 			cv::threshold(parts_for_vec, parts_for_vec, 30, 255, CV_THRESH_BINARY);
 			analog2digital(parts_for_vec, templ, vectorparts_one, vectorabsolute_parts_one, false);
 			chubbyVector(vectorabsolute_parts_one);
+			solveProblem(vectorparts_one);
 			for (int j = 0; j < vectorparts_one.size(); j++)
 			{
 				for (int k = 0; k < vectorparts_one[j].size(); k++)
@@ -210,18 +210,72 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 			vectorabsolute_parts_one.clear();
 			std::cout << "Finish processing " << i << " parts" << std::endl;
 		}
-		std::cout << "============Finish getting the vector of parts===============" << std::endl;
+		std::cout << "============ Finish getting the vector of parts ===============" << std::endl;
 		get_parts_vector = false;
+		find_solution = true;
 	}
 	// ===== end =====
 
 	// start finding the answer.....                %TODO
 	// move the parts to correct place
 	// new_game = true
-	
+	if (find_solution)
+	{
+		int target_x, target_y;
+		int now_x, now_y;
+		double center_x, center_y;
+		double move_x, move_y;
+		int delta_x, delta_y;
+		std::cout << "============ Start getting the Solution ===============" << std::endl;
+		getSolution(0);	
+		// for (int i = 0; i < 3; i++)
+		for (int i = 0; i < vectorsolution.size(); i++)
+		{
+			std::cout << "parts " << i + 1 << " should move to ";
+			std::cout << "row: " << vectorsolution[i][0] << ", column: " << vectorsolution[i][1] << std::endl;
+			target_x = vectorabsolute[vectorsolution[i][0]][vectorsolution[i][1]].x;
+			target_y = vectorabsolute[vectorsolution[i][0]][vectorsolution[i][1]].y;
+			now_x = vectorabsolute_parts[i][0][0].x;
+			now_y = vectorabsolute_parts[i][0][0].y;
+			// control of DIP
+			center_x = 0.8 - centers[i+1].y / pt_gray.rows;
+			center_y = centers[i+1].x / pt_gray.cols;
+			device->comHitUp();
+			device->comMoveToScale(center_x, center_y);
+			_sleep(1000);
+			device->comHitDown();
+			// device->comMoveToScale(0.25, 0.4);
+			// _sleep(1000);
+
+			delta_x = target_x - now_x;
+			delta_y = target_y - now_y;
+			// std::cout << "parts " << i + 1 << " should move " << delta_x << " " << delta_y << std::endl;
+			move_x = double(delta_y) / pt_gray.rows;
+			move_y = double(delta_x) / pt_gray.cols;
+			std::cout << "movex: " << move_x << "move_y: " << move_y << std::endl;
+			device->comMoveToScale(0.25 - move_x, 0.4 + move_y);
+			_sleep(1000);
+			device->comHitUp();
+		}
+		find_solution = false;
+	}
 	cv::imshow(WIN_NAME, pt_binary);
 
 	return 0; 
+}
+
+void solveProblem(std::vector<std::vector<int>> &vectorbase)
+{
+	for (int i = 1; i < vectorbase.size() - 1; i++)
+	{
+		for (int j = 1; j < vectorbase[i].size() - 1; j++)
+		{
+			if (vectorbase[i][j - 1] != 0 && vectorbase[i][j + 1] != 0 && vectorbase[i + 1][j] != 0 && vectorbase[i - 1][j] != 0)
+			{
+				vectorbase[i][j] = 5;
+			}
+		}
+	}
 }
 
 void chubbyVector(std::vector<std::vector<cv::Point>> &vectorabsolute)
@@ -578,7 +632,72 @@ void getTheHist(cv::Mat *img, cv::Mat &dstImage)
 	}
 }
 
+void getSolution(int k)
+{
+	int length = vectorbase.size() - vectorparts[k].size() + 1;
+	int width = vectorbase[0].size() - vectorparts[k][0].size() + 1;
+	for (int i = 0; i < length; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			if (judgeFinish()) break;
+			if (judge(i, j, k))
+			{
+				vectorsolution.push_back({ i,j });
+				if (judgeFinish())
+					return;
+				getSolution(k + 1);
+			}
+		}
+	}
+	if (!judgeFinish())
+	{
+		removeFromBase(vectorsolution[k - 1][0], vectorsolution[k - 1][1], k - 1);
+		vectorsolution.pop_back();
+	}
+	return;
+}
 
+bool judge(int x, int y, int k)
+{
+	std::vector<std::vector<int>> ans(vectorbase);
+	for (int i = 0; i < vectorparts[k].size(); i++)
+	{
+		for (int j = 0; j < vectorparts[k][0].size(); j++)
+		{
+			ans[i + x][j + y] -= vectorparts[k][i][j];
+			if (ans[i + x][j + y] < 0)
+				return false;
+		}
+	}
+	vectorbase = ans;
+	return true;
+}
+
+void removeFromBase(int x, int y, int k)
+{
+	for (int i = 0; i < vectorparts[k].size(); i++)
+	{
+		for (int j = 0; j < vectorparts[k][0].size(); j++)
+		{
+			vectorbase[i + x][j + y] += vectorparts[k][i][j];
+		}
+	}
+	return;
+}
+
+bool judgeFinish()
+{
+	for (int i = 0; i < vectorbase.size(); i++)
+	{
+		for (int j = 0; j < vectorbase[0].size(); j++)
+		{
+			if (vectorbase[i][j] != 0)
+				return false;
+		}
+	}
+	return true;
+}
 
 //鼠标回调函数
 void mouseCallback(int event, int x, int y, int flags, void*param)

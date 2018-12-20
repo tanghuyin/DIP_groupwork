@@ -51,6 +51,11 @@ void analog2digital(cv::Mat &img, std::vector<cv::Mat> &templ, std::vector<std::
 void chubbyVector(std::vector<std::vector<cv::Point>> &vectorabsolute);
 void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Pointlist, int type, bool isBase);
 void removeOtherGrayScale(cv::Mat &gray_pt, int target_gray_scale);
+void getSolution(int k);
+bool judge(int x, int y, int k);
+bool judgeFinish();
+void removeFromBase(int x, int y, int k);
+void solveProblem(std::vector<std::vector<int>> &vectorbase);
 
 #endif
 #endif
