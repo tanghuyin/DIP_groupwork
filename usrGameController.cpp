@@ -3,14 +3,15 @@
 #define PI 3.1415926
 #ifdef VIA_OPENCV
 
-bool flag = true;
 bool new_game = true;
 bool get_parts_vector = false;
 bool get_parts = true;
 bool find_solution = false;
+bool judgeFinish = false;
 int partsnum = 0;
 double lastx = 0, lasty = 0;
 std::string read_file;
+std::string ready;
 std::vector<std::vector<cv::Point>> contours;
 std::vector<cv::Vec4i> hierarchy;
 std::vector<std::vector<cv::Point>> contours1;
@@ -59,7 +60,6 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 	cv::Mat pt_gray, pt_binary, edge, parts, base, partsinv, partsAndBase;
 	int width = pt.cols;
 	int height = pt.rows;
-	int pixelCount[256] = { 0 };
 	int max = 0;
 	std::vector<cv::Mat> templ; // 4 is square
 	
@@ -87,6 +87,12 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 
 	if (new_game)
 	{
+		partsnum = 0;
+		lastx = 0, lasty = 0;
+		get_parts_vector = false;
+		get_parts = true;
+		find_solution = false;
+		judgeFinish = false;
 		pt_gray_start_of_the_game = pt_gray;
 		// ===== start finding base contour ======
 		cv::findContours(pt_binary, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
@@ -257,9 +263,29 @@ int usrGameController::usrProcessImage(cv::Mat& img)
 			_sleep(1000);
 			device->comHitUp();
 		}
+		device->comMoveToScale(0, 0);
+		_sleep(1000);
 		find_solution = false;
+		new_game = true;
+		contours.clear();
+		contours1.clear();
+		hierarchy.clear();
+		hierarchy1.clear();
+		vectorbase.clear();
+		vectorabsolute.clear(); 
+		vectorparts.clear();
+		vectorabsolute_parts.clear();
+		vectorsolution.clear();
+
+		//std::cout << "Ready for a new game?" << std::endl;
+		//std::cin >> ready;
+		device->comMoveToScale(0.2, 0.4);
+		_sleep(1000);
+		device->comHitOnce();
+		device->comMoveToScale(0, 0);
+		_sleep(5000);
 	}
-	cv::imshow(WIN_NAME, pt_binary);
+	
 
 	return 0; 
 }
@@ -640,24 +666,25 @@ void getSolution(int k)
 	{
 		for (int j = 0; j < width; j++)
 		{
-			if (judgeFinish()) break;
+			if (judgeFinish) break;
 			if (judge(i, j, k))
 			{
 				vectorsolution.push_back({ i,j });
-				if (judgeFinish())
+				if (k == vectorparts.size() - 1)
+					judgeFinish = true;
+				if (judgeFinish)
 					return;
 				getSolution(k + 1);
 			}
 		}
 	}
-	if (!judgeFinish())
+	if (!judgeFinish)
 	{
 		removeFromBase(vectorsolution[k - 1][0], vectorsolution[k - 1][1], k - 1);
 		vectorsolution.pop_back();
 	}
 	return;
 }
-
 bool judge(int x, int y, int k)
 {
 	std::vector<std::vector<int>> ans(vectorbase);
@@ -686,6 +713,7 @@ void removeFromBase(int x, int y, int k)
 	return;
 }
 
+/*
 bool judgeFinish()
 {
 	for (int i = 0; i < vectorbase.size(); i++)
@@ -698,6 +726,7 @@ bool judgeFinish()
 	}
 	return true;
 }
+*/
 
 //鼠标回调函数
 void mouseCallback(int event, int x, int y, int flags, void*param)

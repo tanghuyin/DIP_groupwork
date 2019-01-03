@@ -53,7 +53,7 @@ void findTemplLeftUp(cv::Mat &img, cv::Mat &templ, std::vector<cv::Point> &Point
 void removeOtherGrayScale(cv::Mat &gray_pt, int target_gray_scale);
 void getSolution(int k);
 bool judge(int x, int y, int k);
-bool judgeFinish();
+//bool judgeFinish();
 void removeFromBase(int x, int y, int k);
 void solveProblem(std::vector<std::vector<int>> &vectorbase);
 
